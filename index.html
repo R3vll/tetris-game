@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tetris</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #1e293b; /* High-contrast dark background */
+            color: #1e293b; /* Dark text on light areas, but primary text will be light */
+            margin: 0;
+            overflow: hidden;
+        }
+        .game-container {
+            text-align: center;
+            padding: 20px;
+            border: 3px solid #334155;
+            border-radius: 10px;
+            background-color: #0f172a; /* Deeper background for contrast */
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+        }
+        h1 {
+            color: #38bdf8; /* Cohesive gradient header color */
+        }
+        .game-area {
+            display: flex;
+            gap: 30px;
+            margin-top: 20px;
+        }
+        #grid {
+            display: grid;
+            grid-template-columns: repeat(10, 20px);
+            grid-template-rows: repeat(20, 20px);
+            border: 2px solid #334155;
+            background-color: #000;
+        }
+        .grid-cell {
+            width: 20px;
+            height: 20px;
+            box-sizing: border-box;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: background-color 0.1s;
+        }
+        .sidebar {
+            width: 150px;
+        }
+        .score-panel, .next-piece-panel {
+            margin-bottom: 20px;
+            padding: 10px;
+            border: 1px solid #334155;
+            background-color: #0f172a;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+        }
+        h2 {
+            color: #94a3b8;
+            font-size: 1.1em;
+        }
+        #score {
+            font-size: 2em;
+            font-weight: bold;
+            color: #facc15; /* Highlight score */
+        }
+        #next-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 15px);
+            grid-template-rows: repeat(4, 15px);
+            width: 60px;
+            height: 60px;
+            margin: 10px auto;
+            border: 1px solid #334155;
+            background-color: #111827;
+        }
+        .next-cell {
+            width: 15px;
+            height: 15px;
+            box-sizing: border-box;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        #start-button {
+            padding: 10px 20px;
+            font-size: 1em;
+            cursor: pointer;
+            background-color: #10b981; /* Green */
+            color: white;
+            border: none;
+            border-radius: 5px;
+            margin-top: 15px;
+            transition: background-color 0.2s;
+        }
+        #start-button:hover {
+            background-color: #059669;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1>Tetris</h1>
+        <div class="game-area">
+            <div id="grid"></div>
+            <div class="sidebar">
+                <div class="score-panel">
+                    <h2>Score</h2>
+                    <div id="score">0</div>
+                </div>
+                <div class="next-piece-panel">
+                    <h2>Next</h2>
+                    <div id="next-grid"></div>
+                </div>
+                <button id="start-button">Start Game</button>
+            </div>
+        </div>
+    </div>
+    <script>
+        // Tetris Game Logic (script.js)
+        const GRID_WIDTH = 10;
+        const GRID_HEIGHT = 20;
+        const TILE_SIZE = 20;
+        const gridElement = document.getElementById('grid');
+        const scoreElement = document.getElementById('score');
+        const nextGridElement = document.getElementById('next-grid');
+        const startButton = document.getElementById('start-button');
+
+        let grid = [];
+        let currentPiece;
+        let nextPiece;
+        let score = 0;
+        let gameLoopInterval;
+        let isPlaying = false;
+
+        const TETROMINOS = {
+            'I': { shape: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: '#00FFFF' }, // Cyan
+            'J': { shape: [[1,0,0],[1,1,1],[0,0,0]], color: '#3b82f6' }, // Blue
+            'L': { shape: [[0,0,1],[1,1,1],[0,0,0]], color: '#f97316' }, // Orange
+            'O': { shape: [[1,1],[1,1]], color: '#facc15' }, // Yellow
+            'S': { shape: [[0,1,1],[1,1,0],[0,0,0]], color: '#10b981' }, // Green
+            'T': { shape: [[0,1,0],[1,1,1],[0,0,0]], color: '#a855f7' }, // Purple
+            'Z': { shape: [[1,1,0],[0,1,1],[0,0,0]], color: '#ef4444' }  // Red
+        };
+
+        function createGrid() {
+            grid = Array(GRID_HEIGHT).fill(null).map(() => Array(GRID_WIDTH).fill(0));
+            gridElement.innerHTML = '';
+            for (let r = 0; r < GRID_HEIGHT; r++) {
+                for (let c = 0; c < GRID_WIDTH; c++) {
+                    const cell = document.createElement('div');
+                    cell.classList.add('grid-cell');
+                    cell.id = `cell-${r}-${c}`;
+                    gridElement.appendChild(cell);
+                }
+            }
+        }
+
+        function createNextGrid() {
+            nextGridElement.innerHTML = '';
+            for (let r = 0; r < 4; r++) {
+                for (let c = 0; c < 4; c++) {
+                    const cell = document.createElement('div');
+                    cell.classList.add('next-cell');
+                    cell.id = `next-cell-${r}-${c}`;
+                    nextGridElement.appendChild(cell);
+                }
+            }
+        }
+
+        function getRandomPiece() {
+            const keys = Object.keys(TETROMINOS);
+            const randomKey = keys[Math.floor(Math.random() * keys.length)];
+            const pieceData = TETROMINOS[randomKey];
+            return { ...pieceData, type: randomKey, x: Math.floor(GRID_WIDTH / 2) - Math.floor(pieceData.shape[0].length / 2), y: 0 };
+        }
+
+        function spawnPiece() {
+            if (!nextPiece) {
+                nextPiece = getRandomPiece();
+            }
+            currentPiece = nextPiece;
+            nextPiece = getRandomPiece();
+            drawNextPiece(nextPiece);
+
+            if (checkCollision(currentPiece.shape, currentPiece.x, currentPiece.y, grid)) {
+                gameOver();
+                return false;
+            }
+            return true;
+        }
+
+        function drawNextPiece(piece) {
+            for (let r = 0; r < 4; r++) {
+                for (let c = 0; c < 4; c++) {
+                    const cell = document.getElementById(`next-cell-${r}-${c}`);
+                    cell.style.backgroundColor = (piece.shape[r] && piece.shape[r][c] ? piece.color : '#111827');
+                }
+            }
+        }
+
+        function drawPiece(piece, isNext = false) {
+            if (isNext) {
+                drawNextPiece(piece);
+                return;
+            }
+            for (let r = 0; r < piece.shape.length; r++) {
+                for (let c = 0; c < piece.shape[r].length; c++) {
+                    if (piece.shape[r][c]) {
+                        const gridR = piece.y + r;
+                        const gridC = piece.x + c;
+                        if (gridR >= 0 && gridR < GRID_HEIGHT && gridC >= 0 && gridC < GRID_WIDTH) {
+                            const cell = document.getElementById(`cell-${gridR}-${gridC}`);
+                            cell.style.backgroundColor = piece.color;
+                        }
+                    }
+                }
+            }
+        }
+
+        function undrawPiece(piece, isNext = false) {
+            if (isNext) {
+                for (let r = 0; r < 4; r++) {
+                    for (let c = 0; c < 4; c++) {
+                        const cell = document.getElementById(`next-cell-${r}-${c}`);
+                        cell.style.backgroundColor = '#111827';
+                    }
+                }
+                return;
+            }
+            for (let r = 0; r < piece.shape.length; r++) {
+                for (let c = 0; c < piece.shape[r].length; c++) {
+                    if (piece.shape[r][c]) {
+                        const gridR = piece.y + r;
+                        const gridC = piece.x + c;
+                        if (gridR >= 0 && gridR < GRID_HEIGHT && gridC >= 0 && gridC < GRID_WIDTH) {
+                            const cell = document.getElementById(`cell-${gridR}-${gridC}`);
+                            cell.style.backgroundColor = ''; 
+                        }
+                    }
+                }
+            }
+        }
+
+        function checkCollision(shape, newX, newY, currentGrid) {
+            for (let r = 0; r < shape.length; r++) {
+                for (let c = 0; c < shape[r].length; c++) {
+                    if (shape[r][c]) {
+                        const gridR = newY + r;
+                        const gridC = newX + c;
+
+                        if (gridR < 0 || gridR >= GRID_HEIGHT || gridC < 0 || gridC >= GRID_WIDTH) {
+                            return true; 
+                        }
+                        if (gridR >= 0 && currentGrid[gridR][gridC] !== 0) {
+                            return true; 
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
+        function lockPiece() {
+            for (let r = 0; r < currentPiece.shape.length; r++) {
+                for (let c = 0; c < currentPiece.shape[r].length; c++) {
+                    if (currentPiece.shape[r][c]) {
+                        const gridR = currentPiece.y + r;
+                        const gridC = currentPiece.x + c;
+                        if (gridR >= 0) {
+                            grid[gridR][gridC] = currentPiece.type;
+                        }
+                    }
+                }
+            }
+            clearLines();
+            if (spawnPiece()) {
+                drawPiece(currentPiece);
+            }
+        }
+
+        function clearLines() {
+            let linesCleared = 0;
+            for (let r = GRID_HEIGHT - 1; r >= 0; r--) {
+                if (grid[r].every(cell => cell !== 0)) {
+                    grid.splice(r, 1);
+                    grid.unshift(Array(GRID_WIDTH).fill(0));
+                    linesCleared++;
+                    r++;
+                }
+            }
+            if (linesCleared > 0) {
+                score += linesCleared * 100 * linesCleared;
+                scoreElement.textContent = score;
+                drawGrid();
+            }
+        }
+
+        function movePiece(dx, dy) {
+            if (!isPlaying) return false;
+            const newX = currentPiece.x + dx;
+            const newY = currentPiece.y + dy;
+
+            if (!checkCollision(currentPiece.shape, newX, newY, grid)) {
+                undrawPiece(currentPiece);
+                currentPiece.x = newX;
+                currentPiece.y = newY;
+                drawPiece(currentPiece);
+                return true;
+            }
+            return false;
+        }
+
+        function rotatePiece(piece) {
+            const N = piece.shape.length;
+            const newShape = Array(N).fill(0).map(() => Array(N).fill(0));
+            for (let r = 0; r < N; r++) {
+                for (let c = 0; c < N; c++) {
+                    newShape[c][N - 1 - r] = piece.shape[r][c];
+                }
+            }
+            if (!checkCollision(newShape, piece.x, piece.y, grid)) return newShape;
+            if (!checkCollision(newShape, piece.x + 1, piece.y, grid)) return newShape;
+            if (!checkCollision(newShape, piece.x - 1, piece.y, grid)) return newShape;
+            return piece.shape;
+        }
+
+        function handleInput(e) {
+            if (!isPlaying) return;
+            switch (e.key) {
+                case 'ArrowLeft':
+                    movePiece(-1, 0);
+                    break;
+                case 'ArrowRight':
+                    movePiece(1, 0);
+                    break;
+                case 'ArrowDown':
+                    if (movePiece(0, 1)) {}
+                    break;
+                case 'ArrowUp': 
+                    currentPiece.shape = rotatePiece(currentPiece);
+                    drawPiece(currentPiece);
+                    break;
+                case ' ': 
+                    while(movePiece(0, 1)) {}
+                    lockPiece();
+                    break;
+                default:
+                    return;
+            }
+            drawGrid();
+        }
+
+        function dropPiece() {
+            if (!movePiece(0, 1)) {
+                lockPiece();
+            }
+            drawGrid();
+        }
+
+        function startGame() {
+            if (isPlaying) return;
+            isPlaying = true;
+            score = 0;
+            scoreElement.textContent = score;
+            startButton.textContent = "Restart Game";
+            
+            createGrid();
+            createNextGrid();
+            
+            nextPiece = null;
+            spawnPiece();
+
+            if (gameLoopInterval) clearInterval(gameLoopInterval);
+            gameLoopInterval = setInterval(dropPiece, 1000);
+            
+            document.addEventListener('keydown', handleInput);
+        }
+
+        function gameOver() {
+            isPlaying = false;
+            clearInterval(gameLoopInterval);
+            startButton.textContent = "Start Game";
+            document.removeEventListener('keydown', handleInput);
+            alert("Game Over! Final Score: " + score);
+        }
+
+        function drawGrid() {
+            // Clear all cells first
+            for (let r = 0; r < GRID_HEIGHT; r++) {
+                for (let c = 0; c < GRID_WIDTH; c++) {
+                    const cell = document.getElementById(`cell-${r}-${c}`);
+                    cell.style.backgroundColor = ''; 
+                }
+            }
+            
+            // 1. Draw locked blocks
+            for (let r = 0; r < GRID_HEIGHT; r++) {
+                for (let c = 0; c < GRID_WIDTH; c++) {
+                    const type = grid[r][c];
+                    if (type !== 0) {
+                        const colors = { 'I': '#00FFFF', 'J': '#3b82f6', 'L': '#f97316', 'O': '#facc15', 'S': '#10b981', 'T': '#a855f7', 'Z': '#ef4444' };
+                        const cell = document.getElementById(`cell-${r}-${c}`);
+                        cell.style.backgroundColor = colors[type] || 'gray';
+                    }
+                }
+            }
+
+            // 2. Draw current piece on top
+            drawPiece(currentPiece);
+        }
+
+
+        startButton.addEventListener('click', startGame);
+
+        // Initial setup
+        createGrid();
+        createNextGrid();
+        drawGrid();
+    </script>
+</body>
+</html>
