@@ -277,8 +277,9 @@
                 }
             }
             clearLines();
-            spawnPiece();
+            const spawned = spawnPiece();
             drawGrid();
+            if (!spawned) return; // Game over handled by spawnPiece -> gameOver()
         }
 
         function clearLines() {
@@ -373,7 +374,13 @@
         }
 
         function startGame() {
-            if (isPlaying) return;
+            // Allow restart even while playing
+            if (isPlaying) {
+                isPlaying = false;
+                clearInterval(gameLoopInterval);
+                gameLoopInterval = null;
+                document.removeEventListener('keydown', handleInput);
+            }
             isPlaying = true;
             score = 0;
             scoreElement.textContent = score;
@@ -383,8 +390,10 @@
             createNextGrid();
             
             nextPiece = null;
-            spawnPiece();
+            const spawned = spawnPiece();
             drawGrid();
+
+            if (!spawned) return; // Game over on first piece
 
             if (gameLoopInterval) clearInterval(gameLoopInterval);
             gameLoopInterval = setInterval(dropPiece, 1000);
@@ -395,6 +404,7 @@
         function gameOver() {
             isPlaying = false;
             clearInterval(gameLoopInterval);
+            gameLoopInterval = null;
             startButton.textContent = "Start Game";
             document.removeEventListener('keydown', handleInput);
             alert("Game Over! Final Score: " + score);
