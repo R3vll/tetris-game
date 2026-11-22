@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tetris</title>
     <style>
+        html {
+            overflow: hidden;
+        }
         body {
             font-family: 'Segoe UI', system-ui, sans-serif;
             display: flex;
@@ -334,6 +337,10 @@
 
         function handleInput(e) {
             if (!isPlaying) return;
+            // Prevent browser default behavior (scrolling) for game keys
+            if (['ArrowLeft','ArrowRight','ArrowDown','ArrowUp',' '].includes(e.key)) {
+                e.preventDefault();
+            }
             switch (e.key) {
                 case 'ArrowLeft':
                     movePiece(-1, 0);
@@ -342,10 +349,12 @@
                     movePiece(1, 0);
                     break;
                 case 'ArrowDown':
-                    if (movePiece(0, 1)) {}
+                    movePiece(0, 1);
                     break;
                 case 'ArrowUp': 
+                    undrawPiece(currentPiece);
                     currentPiece.shape = rotatePiece(currentPiece);
+                    drawPiece(currentPiece);
                     break;
                 case ' ': 
                     while(movePiece(0, 1)) {}
@@ -354,7 +363,6 @@
                 default:
                     return;
             }
-            drawGrid();
         }
 
         function dropPiece() {
