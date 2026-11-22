@@ -274,9 +274,8 @@
                 }
             }
             clearLines();
-            if (spawnPiece()) {
-                drawPiece(currentPiece);
-            }
+            spawnPiece();
+            drawGrid();
         }
 
         function clearLines() {
@@ -292,7 +291,6 @@
             if (linesCleared > 0) {
                 score += linesCleared * 100 * linesCleared;
                 scoreElement.textContent = score;
-                drawGrid();
             }
         }
 
@@ -319,9 +317,18 @@
                     newShape[c][N - 1 - r] = piece.shape[r][c];
                 }
             }
+            // Try original position
             if (!checkCollision(newShape, piece.x, piece.y, grid)) return newShape;
-            if (!checkCollision(newShape, piece.x + 1, piece.y, grid)) return newShape;
-            if (!checkCollision(newShape, piece.x - 1, piece.y, grid)) return newShape;
+            // Try kick right
+            if (!checkCollision(newShape, piece.x + 1, piece.y, grid)) {
+                piece.x += 1;
+                return newShape;
+            }
+            // Try kick left
+            if (!checkCollision(newShape, piece.x - 1, piece.y, grid)) {
+                piece.x -= 1;
+                return newShape;
+            }
             return piece.shape;
         }
 
@@ -339,7 +346,6 @@
                     break;
                 case 'ArrowUp': 
                     currentPiece.shape = rotatePiece(currentPiece);
-                    drawPiece(currentPiece);
                     break;
                 case ' ': 
                     while(movePiece(0, 1)) {}
@@ -370,6 +376,7 @@
             
             nextPiece = null;
             spawnPiece();
+            drawGrid();
 
             if (gameLoopInterval) clearInterval(gameLoopInterval);
             gameLoopInterval = setInterval(dropPiece, 1000);
@@ -416,7 +423,6 @@
         // Initial setup
         createGrid();
         createNextGrid();
-        drawGrid();
     </script>
 </body>
 </html>
